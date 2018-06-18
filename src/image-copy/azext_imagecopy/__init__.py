@@ -41,6 +41,8 @@ class ImageCopyCommandsLoader(AzCommandsLoader):
                        help='Include this switch to delete temporary resources upon completion')
             c.argument('target_name', options_list=['--target-name'],
                        help='Name of the final image that will be created')
+            c.argument('destination_subscription_id', options_list=['--destination-subscription-id'], default=None,
+                       help='Place the copy in a different subscription')
 
 
 COMMAND_LOADER_CLS = ImageCopyCommandsLoader

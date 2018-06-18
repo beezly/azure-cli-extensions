@@ -6,17 +6,21 @@
 from multiprocessing import Pool
 
 from azext_imagecopy.cli_utils import run_cli_command, prepare_cli_command
-from azext_imagecopy.create_target import create_target_image
+from azext_imagecopy.create_target import create_target_image, get_subscription_id
 
 from knack.util import CLIError
 from knack.log import get_logger
 logger = get_logger(__name__)
 
 
-# pylint: disable=too-many-statements
+# pylint: disable=too-many-statements,too-many-locals
 def imagecopy(source_resource_group_name, source_object_name, target_location,
               target_resource_group_name, source_type='image', cleanup='false',
-              parallel_degree=-1, tags=None, target_name=None):
+              parallel_degree=-1, tags=None, target_name=None,
+              destination_subscription_id=None):
+
+    if destination_subscription_id:
+        source_subscription_id = get_subscription_id()
 
     # get the os disk id from source vm/image
     logger.warn("Getting os disk id of the source vm/image")
@@ -89,6 +93,9 @@ def imagecopy(source_resource_group_name, source_object_name, target_location,
     logger.debug("source os disk snapshot url: %s",
                  source_os_disk_snapshot_url)
 
+    if destination_subscription_id:
+        set_subscription_id(destination_subscription_id)
+
     # Start processing in the target locations
 
     transient_resource_group_name = 'image-copy-rg'
@@ -148,6 +155,9 @@ def imagecopy(source_resource_group_name, source_object_name, target_location,
                                        '--name', transient_resource_group_name])
         run_cli_command(cli_cmd)
 
+        if destination_subscription_id:
+            set_subscription_id(source_subscription_id)
+
         # Revoke sas for source snapshot
         cli_cmd = prepare_cli_command(['snapshot', 'revoke-access',
                                        '--name', source_os_disk_snapshot_name,
@@ -179,3 +189,14 @@ def create_resource_group(resource_group_name, location):
                                    '--location', location])
 
     run_cli_command(cli_cmd)
+
+
+def set_subscription_id(subscription_id):
+    logger.warn("Changing subscription ID to %s", subscription_id)
+    cli_cmd = prepare_cli_command(['account', 'set',
+                                   '--subscription', subscription_id])
+    cmd_output = run_cli_command(cli_cmd)
+    if 'true' in cmd_output:
+        return
+
+    logger.error("Failed to change subscription ID to %s", subscription_id)
